@@ -1,0 +1,7 @@
+pandas>=1.5.0
+openpyxl>=3.0.0
+python-dotenv>=0.20.0
+win32com>=1.0.0; sys_platform == 'win32'
+pywin32>=300; sys_platform == 'win32'
+pyrfc>=2.0.0
+colorama>=0.4.6
