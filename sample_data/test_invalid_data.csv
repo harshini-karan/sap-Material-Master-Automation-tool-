@@ -1,0 +1,6 @@
+Material_Number,Material_Type,Industry_Sector,Description,Base_Unit,Material_Group,Plant,Storage_Location,Valuation_Class,Price,Currency
+,INVALID,M,Test with invalid type,EA,1000,1000,0001,3000,100.00,USD
+,,M,Test with missing type,EA,1000,1000,0001,3000,150.00,USD
+,FERT,X,Test with invalid sector,KG,2000,1000,0001,3100,25.50,USD
+,FERT,M,,EA,1500,1000,0001,3200,75.00,USD
+,FERT,M,Valid material,EA,1000,1000,0001,3000,100.00,USD

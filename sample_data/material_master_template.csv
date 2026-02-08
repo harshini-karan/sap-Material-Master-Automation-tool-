@@ -1,0 +1,5 @@
+Material_Number,Material_Type,Industry_Sector,Description,Base_Unit,Material_Group,Plant,Storage_Location,Valuation_Class,Price,Currency
+,FERT,M,Finished Product Example 1,EA,1000,1000,0001,3000,100.00,USD
+,FERT,M,Finished Product Example 2,EA,1000,1000,0001,3000,150.00,USD
+,ROH,M,Raw Material Example 1,KG,2000,1000,0001,3100,25.50,USD
+,HALB,M,Semi-Finished Product,PC,1500,1000,0001,3200,75.00,USD
