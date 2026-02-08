@@ -174,7 +174,9 @@ class MaterialMasterAutomation:
         
         # Check mandatory fields
         for field in self.MANDATORY_FIELDS:
-            if field not in material_data or not str(material_data[field]).strip():
+            value = material_data.get(field)
+            # Check if field is missing, None, NaN, or empty string
+            if pd.isna(value) or not str(value).strip() or str(value).lower() == 'nan':
                 errors.append(f"Mandatory field '{field}' is missing or empty")
         
         # Validate material type
