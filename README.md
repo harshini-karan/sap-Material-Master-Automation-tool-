@@ -158,18 +158,85 @@ Status: completed
 ```
 sap-Material-Master-Automation-tool-/
 ├── src/
-│   └── material_master.py       # Main automation module
+│   ├── __init__.py              # Package initialization
+│   └── material_master.py       # Main automation module (525 lines)
+│       ├── MaterialMasterAutomation class
+│       ├── validate_material_data()
+│       ├── read_input_file()
+│       ├── connect_sap_gui()
+│       ├── connect_rfc()
+│       ├── create_material_gui()
+│       ├── create_material_rfc()
+│       └── process_materials()
 ├── examples/
 │   ├── bulk_create_gui.py       # GUI method example
 │   ├── bulk_create_rfc.py       # RFC method example
 │   └── validate_data.py         # Validation example
 ├── sample_data/
-│   └── material_master_template.csv  # Sample input file
+│   ├── material_master_template.csv  # Sample input file (valid data)
+│   └── test_invalid_data.csv         # Test file (invalid data)
 ├── logs/                        # Log files (auto-created)
 ├── config_template.ini          # Configuration template
 ├── requirements.txt             # Python dependencies
 ├── .gitignore                   # Git ignore rules
+├── QUICKSTART.md                # Quick start guide
 └── README.md                    # This file
+```
+
+## 🔄 Architecture Flow
+
+```
+┌─────────────────┐
+│  Input File     │
+│  (CSV/Excel)    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Data Reader    │
+│  (pandas)       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Validation     │
+│  Engine         │
+└────────┬────────┘
+         │
+         ├──── Valid ──────┐
+         │                 ▼
+         │        ┌─────────────────┐
+         │        │  Connection     │
+         │        │  Manager        │
+         │        └────────┬────────┘
+         │                 │
+         │        ┌────────┴────────┐
+         │        │                 │
+         │        ▼                 ▼
+         │  ┌──────────┐      ┌──────────┐
+         │  │SAP GUI   │      │RFC API   │
+         │  │Scripting │      │Connection│
+         │  └────┬─────┘      └────┬─────┘
+         │       │                 │
+         │       └────────┬────────┘
+         │                ▼
+         │        ┌─────────────────┐
+         │        │  SAP MM01       │
+         │        │  Transaction    │
+         │        └────────┬────────┘
+         │                 │
+         │                 ▼
+         │        ┌─────────────────┐
+         │        │  Material       │
+         │        │  Created        │
+         │        └────────┬────────┘
+         │                 │
+         └──── Invalid ────┤
+                           ▼
+                  ┌─────────────────┐
+                  │  Logging &      │
+                  │  Results        │
+                  └─────────────────┘
 ```
 
 ## 🔒 Security Notes
