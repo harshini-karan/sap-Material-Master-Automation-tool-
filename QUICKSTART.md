@@ -27,12 +27,18 @@ python examples/validate_data.py
 ### Option A: Using SAP GUI Scripting (Windows only)
 ```bash
 # Make sure SAP GUI is running and you're logged in
-python src/material_master.py sample_data/material_master_template.csv --method gui
+python src/material_master.py sample_data/material_master_template.csv --method gui --action create
+
+# Update materials (requires Material_Number)
+python src/material_master.py sample_data/material_master_template.csv --method gui --action update
 ```
 
 ### Option B: Using RFC API
 ```bash
-python src/material_master.py sample_data/material_master_template.csv --method rfc
+python src/material_master.py sample_data/material_master_template.csv --method rfc --action create
+
+# Validate without posting to SAP
+python src/material_master.py sample_data/material_master_template.csv --action validate
 ```
 
 ## Step 6: Check Results

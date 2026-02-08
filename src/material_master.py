@@ -160,7 +160,12 @@ class MaterialMasterAutomation:
             self.logger.error(f"Failed to connect via RFC: {str(e)}")
             return False
     
-    def validate_material_data(self, material_data: Dict) -> Tuple[bool, List[str]]:
+    def validate_material_data(
+        self,
+        material_data: Dict,
+        require_material_number: bool = False,
+        validate_mandatory_fields: bool = True
+    ) -> Tuple[bool, List[str]]:
         """
         Validate material master data
         
@@ -173,12 +178,18 @@ class MaterialMasterAutomation:
         errors = []
         
         # Check mandatory fields
-        for field in self.MANDATORY_FIELDS:
-            value = material_data.get(field)
-            # Check if field is missing, None, NaN, or empty string
-            if pd.isna(value) or not str(value).strip() or str(value).lower() == 'nan':
-                errors.append(f"Mandatory field '{field}' is missing or empty")
-        
+        if validate_mandatory_fields:
+            for field in self.MANDATORY_FIELDS:
+                value = material_data.get(field)
+                # Check if field is missing, None, NaN, or empty string
+                if pd.isna(value) or not str(value).strip() or str(value).lower() == 'nan':
+                    errors.append(f"Mandatory field '{field}' is missing or empty")
+
+        if require_material_number:
+            material_number = material_data.get('Material_Number')
+            if pd.isna(material_number) or not str(material_number).strip() or str(material_number).lower() == 'nan':
+                errors.append("Material_Number is required for updates")
+
         # Validate material type
         valid_material_types = ['FERT', 'ROH', 'HALB', 'HAWA', 'VERP']
         if 'Material_Type' in material_data:
@@ -294,6 +305,76 @@ class MaterialMasterAutomation:
             error_msg = f"Error creating material via GUI: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg
+
+    def update_material_gui(self, material_data: Dict) -> Tuple[bool, str]:
+        """
+        Update material using SAP GUI scripting
+
+        Args:
+            material_data: Dictionary containing material data
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.sap_session:
+            return False, "SAP GUI session not connected"
+
+        try:
+            delay = float(self.config.get('Automation', 'delay_between_actions', fallback='0.5'))
+            transaction = self.config.get('SAP', 'transaction_code_update', fallback='MM02')
+
+            # Start transaction
+            self.logger.info(f"Starting transaction {transaction}")
+            self.sap_session.StartTransaction(transaction)
+            time.sleep(delay)
+
+            # Enter material number
+            self.sap_session.findById("wnd[0]/usr/ctxtRMMG1-MATNR").text = str(
+                material_data.get('Material_Number', '')
+            )
+            self.sap_session.findById("wnd[0]").sendVKey(0)
+            time.sleep(delay)
+
+            # Update description if provided
+            if material_data.get('Description'):
+                self.sap_session.findById(
+                    "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpOVERVIEW/"
+                    "ssubSUBSCREEN_BODY:SAPLMGMM:2100/subSUB_VIEWSET:SAPLMGMM:2200/"
+                    "ctxtMAKT-MAKTX"
+                ).text = material_data.get('Description', '')
+
+            # Update base unit if provided
+            if material_data.get('Base_Unit'):
+                self.sap_session.findById(
+                    "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpOVERVIEW/"
+                    "ssubSUBSCREEN_BODY:SAPLMGMM:2100/subSUB_VIEWSET:SAPLMGMM:2200/"
+                    "ctxtMARA-MEINS"
+                ).text = material_data.get('Base_Unit', '')
+
+            # Update material group if provided
+            if material_data.get('Material_Group'):
+                self.sap_session.findById(
+                    "wnd[0]/usr/tabsTAXI_TABSTRIP_OVERVIEW/tabpOVERVIEW/"
+                    "ssubSUBSCREEN_BODY:SAPLMGMM:2100/subSUB_VIEWSET:SAPLMGMM:2200/"
+                    "ctxtMARA-MATKL"
+                ).text = str(material_data['Material_Group'])
+
+            time.sleep(delay)
+
+            # Save changes (this is a simulation - actual field IDs may vary)
+            self.sap_session.findById("wnd[0]").sendVKey(11)  # Ctrl+S
+            time.sleep(delay * 2)
+
+            # Get status message
+            status_text = self.sap_session.findById("wnd[0]/sbar").text
+
+            self.logger.info(f"Material updated successfully: {status_text}")
+            return True, status_text
+
+        except Exception as e:
+            error_msg = f"Error updating material via GUI: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
     
     def create_material_rfc(self, material_data: Dict) -> Tuple[bool, str]:
         """
@@ -343,19 +424,77 @@ class MaterialMasterAutomation:
             error_msg = f"Error creating material via RFC: {str(e)}"
             self.logger.error(error_msg)
             return False, error_msg
+
+    def update_material_rfc(self, material_data: Dict) -> Tuple[bool, str]:
+        """
+        Update material using RFC API
+
+        Args:
+            material_data: Dictionary containing material data
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.rfc_connection:
+            return False, "RFC connection not established"
+
+        try:
+            head_data = {
+                'MATERIAL': material_data.get('Material_Number', ''),
+                'BASIC_VIEW': 'X'
+            }
+            if material_data.get('Industry_Sector'):
+                head_data['IND_SECTOR'] = material_data.get('Industry_Sector', 'M')
+            if material_data.get('Material_Type'):
+                head_data['MATL_TYPE'] = material_data.get('Material_Type', '')
+
+            client_data = {}
+            if material_data.get('Base_Unit'):
+                client_data['BASE_UOM'] = material_data.get('Base_Unit', '')
+
+            material_description = {}
+            if material_data.get('Description'):
+                material_description = {
+                    'LANGU': 'EN',
+                    'MATL_DESC': material_data.get('Description', '')
+                }
+
+            result = self.rfc_connection.call(
+                'BAPI_MATERIAL_SAVEDATA',
+                HEADDATA=head_data,
+                CLIENTDATA=client_data,
+                MATERIALDESCRIPTION=material_description
+            )
+
+            if result.get('RETURN', {}).get('TYPE') in self.RFC_SUCCESS_TYPES:
+                material_number = result.get('NUMBER', '')
+                self.logger.info(f"Material updated successfully via RFC: {material_number}")
+                return True, f"Material {material_number} updated successfully"
+            else:
+                error_msg = result.get('RETURN', {}).get('MESSAGE', 'Unknown error')
+                self.logger.error(f"RFC error: {error_msg}")
+                return False, error_msg
+
+        except Exception as e:
+            error_msg = f"Error updating material via RFC: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
     
-    def process_materials(self, file_path: str, method: str = 'gui') -> Dict:
+    def process_materials(self, file_path: str, method: str = 'gui', action: str = 'create') -> Dict:
         """
         Process materials from input file
-        
+
         Args:
             file_path: Path to input CSV or Excel file
             method: 'gui' for SAP GUI scripting or 'rfc' for RFC API
-            
+            action: 'create', 'update', or 'validate'
+
         Returns:
             Dictionary with processing results
         """
-        self.logger.info(f"Starting material processing from {file_path} using {method} method")
+        self.logger.info(
+            f"Starting material processing from {file_path} using {method} method ({action})"
+        )
         
         # Read input file
         try:
@@ -370,27 +509,28 @@ class MaterialMasterAutomation:
                 'results': []
             }
         
-        # Connect to SAP
-        if method == 'gui':
-            if not self.connect_sap_gui():
-                return {
-                    'status': 'error',
-                    'message': 'Failed to connect to SAP GUI',
-                    'total': len(df),
-                    'success': 0,
-                    'failed': 0,
-                    'results': []
-                }
-        elif method == 'rfc':
-            if not self.connect_rfc():
-                return {
-                    'status': 'error',
-                    'message': 'Failed to connect via RFC',
-                    'total': len(df),
-                    'success': 0,
-                    'failed': 0,
-                    'results': []
-                }
+        # Connect to SAP (skip if only validating)
+        if action != 'validate':
+            if method == 'gui':
+                if not self.connect_sap_gui():
+                    return {
+                        'status': 'error',
+                        'message': 'Failed to connect to SAP GUI',
+                        'total': len(df),
+                        'success': 0,
+                        'failed': 0,
+                        'results': []
+                    }
+            elif method == 'rfc':
+                if not self.connect_rfc():
+                    return {
+                        'status': 'error',
+                        'message': 'Failed to connect via RFC',
+                        'total': len(df),
+                        'success': 0,
+                        'failed': 0,
+                        'results': []
+                    }
         
         # Process each material
         results = []
@@ -404,7 +544,11 @@ class MaterialMasterAutomation:
             self.logger.info(f"Processing record {record_num}/{len(df)}")
             
             # Validate data
-            is_valid, errors = self.validate_material_data(material_data)
+            is_valid, errors = self.validate_material_data(
+                material_data,
+                require_material_number=action == 'update',
+                validate_mandatory_fields=action != 'update'
+            )
             
             if not is_valid:
                 result = {
@@ -418,11 +562,19 @@ class MaterialMasterAutomation:
                 failed_count += 1
                 continue
             
-            # Create material
-            if method == 'gui':
-                success, message = self.create_material_gui(material_data)
-            else:  # rfc
-                success, message = self.create_material_rfc(material_data)
+            if action == 'validate':
+                success = True
+                message = "Validation successful"
+            elif action == 'create':
+                if method == 'gui':
+                    success, message = self.create_material_gui(material_data)
+                else:  # rfc
+                    success, message = self.create_material_rfc(material_data)
+            else:  # update
+                if method == 'gui':
+                    success, message = self.update_material_gui(material_data)
+                else:  # rfc
+                    success, message = self.update_material_rfc(material_data)
             
             result = {
                 'record': record_num,
@@ -486,6 +638,12 @@ def main():
     parser.add_argument('input_file', help='Path to input CSV or Excel file')
     parser.add_argument('--method', choices=['gui', 'rfc'], default='gui',
                        help='Method to use: gui (SAP GUI scripting) or rfc (RFC API)')
+    parser.add_argument(
+        '--action',
+        choices=['create', 'update', 'validate'],
+        default='create',
+        help='Action to perform: create, update, or validate'
+    )
     parser.add_argument('--config', default='config.ini',
                        help='Path to configuration file')
     
@@ -496,7 +654,11 @@ def main():
     
     try:
         # Process materials
-        summary = automation.process_materials(args.input_file, method=args.method)
+        summary = automation.process_materials(
+            args.input_file,
+            method=args.method,
+            action=args.action
+        )
         
         # Print summary
         print("\n" + "="*50)

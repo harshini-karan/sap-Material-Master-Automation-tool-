@@ -4,7 +4,7 @@ A Python-based automation tool for creating, updating, and validating SAP Materi
 
 ## 🚀 Features
 
-- **Bulk Material Creation**: Process multiple materials from Excel or CSV files
+- **Bulk Material Creation & Update**: Process multiple materials from Excel or CSV files
 - **Dual Methods**: Support for both SAP GUI Scripting and RFC API
 - **Data Validation**: Automatic validation of mandatory fields before posting
 - **Error Handling**: Comprehensive logging of success and failures
@@ -51,6 +51,8 @@ sap_client = 100
 sap_user = YOUR_USERNAME
 sap_password = YOUR_PASSWORD
 sap_language = EN
+transaction_code = MM01
+transaction_code_update = MM02
 
 [RFC]
 ashost = sap-server.company.com
@@ -61,7 +63,6 @@ passwd = YOUR_PASSWORD
 lang = EN
 
 [Automation]
-transaction_code = MM01
 delay_between_actions = 0.5
 screenshot_on_error = True
 max_retries = 3
@@ -73,11 +74,11 @@ The tool accepts CSV or Excel files with the following columns:
 
 | Column Name | Required | Description | Example |
 |------------|----------|-------------|---------|
-| Material_Number | No | Material number (leave empty for auto-generation) | |
-| Material_Type | Yes | Type of material | FERT, ROH, HALB |
-| Industry_Sector | Yes | Industry sector | M, C, P, A |
-| Description | Yes | Material description | Finished Product Example |
-| Base_Unit | Yes | Base unit of measure | EA, KG, PC |
+| Material_Number | No | Material number (leave empty for auto-generation; required for updates) | |
+| Material_Type | Yes (create/validate) | Type of material | FERT, ROH, HALB |
+| Industry_Sector | Yes (create/validate) | Industry sector | M, C, P, A |
+| Description | Yes (create/validate) | Material description | Finished Product Example |
+| Base_Unit | Yes (create/validate) | Base unit of measure | EA, KG, PC |
 | Material_Group | No | Material group | 1000 |
 | Plant | No | Plant code | 1000 |
 | Storage_Location | No | Storage location | 0001 |
@@ -92,8 +93,11 @@ See `sample_data/material_master_template.csv` for a complete example.
 ### Method 1: Using SAP GUI Scripting
 
 ```bash
-# Basic usage
-python src/material_master.py sample_data/material_master_template.csv --method gui
+# Basic usage (create)
+python src/material_master.py sample_data/material_master_template.csv --method gui --action create
+
+# Update materials (requires Material_Number)
+python src/material_master.py sample_data/material_master_template.csv --method gui --action update
 
 # With custom config file
 python src/material_master.py your_data.csv --method gui --config your_config.ini
@@ -102,7 +106,10 @@ python src/material_master.py your_data.csv --method gui --config your_config.in
 ### Method 2: Using RFC API
 
 ```bash
-python src/material_master.py sample_data/material_master_template.csv --method rfc
+python src/material_master.py sample_data/material_master_template.csv --method rfc --action create
+
+# Validate without posting to SAP
+python src/material_master.py sample_data/material_master_template.csv --action validate
 ```
 
 ### Example Scripts
@@ -128,7 +135,8 @@ python examples/bulk_create_rfc.py
 
 The tool automatically validates:
 
-- ✅ Mandatory fields (Material_Type, Industry_Sector, Description, Base_Unit)
+- ✅ Mandatory fields for create/validate (Material_Type, Industry_Sector, Description, Base_Unit)
+- ✅ Material_Number required for updates
 - ✅ Valid material types (FERT, ROH, HALB, HAWA, VERP)
 - ✅ Valid industry sectors (M, C, P, A)
 - ✅ Base unit length (max 3 characters)
