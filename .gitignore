@@ -44,7 +44,10 @@ logs/
 # SAP Credentials (security)
 config.ini
 credentials.json
-*.ini
+
+# Template files should be committed
+!*_template.ini
+!config_template.ini
 
 # Test files
 test_output/

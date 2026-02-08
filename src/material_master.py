@@ -40,6 +40,9 @@ class MaterialMasterAutomation:
         'Base_Unit'
     ]
     
+    # SAP return types for RFC success validation
+    RFC_SUCCESS_TYPES = ['', 'S', 'W']  # Empty, Success, Warning
+    
     def __init__(self, config_file: str = 'config.ini'):
         """
         Initialize the automation tool
@@ -247,7 +250,7 @@ class MaterialMasterAutomation:
         
         try:
             delay = float(self.config.get('Automation', 'delay_between_actions', fallback='0.5'))
-            transaction = self.config.get('Automation', 'transaction_code', fallback='MM01')
+            transaction = self.config.get('SAP', 'transaction_code', fallback='MM01')
             
             # Start transaction
             self.logger.info(f"Starting transaction {transaction}")
@@ -325,7 +328,7 @@ class MaterialMasterAutomation:
                 }
             )
             
-            if result.get('RETURN', {}).get('TYPE') in ['', 'S', 'W']:
+            if result.get('RETURN', {}).get('TYPE') in self.RFC_SUCCESS_TYPES:
                 material_number = result.get('NUMBER', '')
                 self.logger.info(f"Material created successfully via RFC: {material_number}")
                 return True, f"Material {material_number} created successfully"
